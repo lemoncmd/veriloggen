@@ -5,6 +5,7 @@ import numpy as np
 import itertools
 from collections import OrderedDict
 from math import log, ceil
+from functools import cache
 
 import veriloggen.core.vtypes as vtypes
 import veriloggen.types.fixed as fx
@@ -925,6 +926,22 @@ class Plus(_BinaryOperator):
     def eval(self):
         return self.left.eval() + self.right.eval()
 
+    @cache
+    def _get_eval(self, args):
+        old_index = -1
+        old_value = None
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        def eval(index):
+            nonlocal old_index
+            nonlocal old_value
+            nonlocal left
+            nonlocal right
+            if old_index != index:
+                old_index = index
+                old_value = left(index) + right(index)
+            return old_value
+        return eval
 
 class Minus(_BinaryOperator):
 
@@ -2773,6 +2790,14 @@ class _Variable(_Numeric):
 
     def eval(self):
         return self
+
+    @cache
+    def _get_eval(self, args):
+        data = args.args[self.input_data]
+        def eval(index):
+            nonlocal data
+            return data[index]
+        return eval
 
     def output(self, data):
         if isinstance(self.input_data, _Numeric):

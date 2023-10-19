@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
 from veriloggen import *
 import veriloggen.thread as vthread
 import veriloggen.types.axi as axi
-
+#import time
 
 def mkLed():
     m = Module('blinkled')
@@ -29,6 +29,10 @@ def mkLed():
     b = strm.source('b')
     c = a + b
     strm.sink(c, 'c')
+#    time_start = time.perf_counter()
+#    print(strm.eval({'a': list(range(512)), 'b': list(range(512))}))
+#    time_end = time.perf_counter()
+#    print('time was %f' % (time_end - time_start))
 
     def comp_stream(size, offset):
         strm.set_source('a', ram_a, offset, size)

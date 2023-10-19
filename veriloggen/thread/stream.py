@@ -165,6 +165,46 @@ class Stream(BaseStream):
 
         self.fsm_id_count = 0
 
+        self.eval_id_count = 0
+
+    class _HashableEvalArgs:
+        def __init__(self, args, id):
+            self.args = args
+            self.id = id
+
+        def __hash__(self):
+            return self.id
+
+    def eval(self, args={}, sinks=None):
+        if sinks is None:
+            sinks = list(self.sinks.keys())
+        elif type(sinks) is str:
+            sinks = [sinks]
+        elif type(sinks) is not list:
+            raise ValueError('sinks must be None, string or list')
+
+        args_ = {}
+        for key in args:
+            print(key)
+            args_[self._dataname(key)] = args[key]
+        args = self._HashableEvalArgs(args_, self.eval_id_count)
+        self.eval_id_count += 1
+
+        results = {}
+        for name in sinks:
+            result = []
+            count = 0
+            evaluator = self.sinks[name]._get_eval(args)
+            while True:
+                try:
+                    result.append(evaluator(count))
+                except Exception as e:
+                    print(e)
+                    break
+                count += 1
+            results[name] = result
+        return results
+
     def source(self, name=None, datawidth=None, point=0, signed=True, no_ctrl=False):
         if self.stream_synthesized:
             raise ValueError(
