@@ -935,8 +935,6 @@ class Plus(_BinaryOperator):
         def eval(index):
             nonlocal old_index
             nonlocal old_value
-            nonlocal left
-            nonlocal right
             if old_index != index:
                 old_index = index
                 old_value = left(index) + right(index)
@@ -2764,10 +2762,7 @@ class _Constant(_Numeric):
 
     def _get_eval(self, args):
         value = self.value
-        def eval(index):
-            nonlocal value
-            return value
-        return eval
+        return lambda index: value
 
 
 class _Variable(_Numeric):
@@ -2801,10 +2796,7 @@ class _Variable(_Numeric):
     @cache
     def _get_eval(self, args):
         data = args.args[self]
-        def eval(index):
-            nonlocal data
-            return data[index]
-        return eval
+        return lambda index: data[index]
 
     def output(self, data):
         if isinstance(self.input_data, _Numeric):
@@ -4903,8 +4895,6 @@ class ReadRAM(_SpecialOperator):
         def eval(index):
             nonlocal old_index
             nonlocal old_value
-            nonlocal mem
-            nonlocal addr
             if old_index != index:
                 old_value = mem[addr(index)]
                 old_index = index
