@@ -34,6 +34,7 @@ def mkLed():
     b = r + 100 + r_addr
 
     strm.sink(b, 'b')
+#    print(strm.eval({'a': [0,1,2,3], 'ext': [3,1,4,1]}))
 
     def comp_stream(size, offset):
         strm.set_source('a', ram_a, offset, size)

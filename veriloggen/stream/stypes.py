@@ -2762,6 +2762,13 @@ class _Constant(_Numeric):
         data = self.value
         self.sig_data = data
 
+    def _get_eval(self, args):
+        value = self.value
+        def eval(index):
+            nonlocal value
+            return value
+        return eval
+
 
 class _Variable(_Numeric):
 
@@ -2793,7 +2800,7 @@ class _Variable(_Numeric):
 
     @cache
     def _get_eval(self, args):
-        data = args.args[self.input_data]
+        data = args.args[self]
         def eval(index):
             nonlocal data
             return data[index]
@@ -4886,6 +4893,23 @@ class ReadRAM(_SpecialOperator):
     @property
     def addr(self):
         return self.raddr
+
+    @cache
+    def _get_eval(self, args):
+        old_index = -1
+        old_value = None
+        mem = args.args[self]
+        addr = self.args[0]._get_eval(args)
+        def eval(index):
+            nonlocal old_index
+            nonlocal old_value
+            nonlocal mem
+            nonlocal addr
+            if old_index != index:
+                old_value = mem[addr(index)]
+                old_index = index
+            return old_value
+        return eval
 
 
 class WriteRAM(_SpecialOperator):

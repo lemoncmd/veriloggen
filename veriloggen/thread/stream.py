@@ -183,11 +183,10 @@ class Stream(BaseStream):
         elif type(sinks) is not list:
             raise ValueError('sinks must be None, string or list')
 
-        args_ = {}
+        _args = {}
         for key in args:
-            print(key)
-            args_[self._dataname(key)] = args[key]
-        args = self._HashableEvalArgs(args_, self.eval_id_count)
+            _args[self.var_name_map[key]] = args[key]
+        args = self._HashableEvalArgs(_args, self.eval_id_count)
         self.eval_id_count += 1
 
         results = {}
@@ -199,7 +198,7 @@ class Stream(BaseStream):
                 try:
                     result.append(evaluator(count))
                 except Exception as e:
-                    print(e)
+                    #print(e)
                     break
                 count += 1
             results[name] = result
