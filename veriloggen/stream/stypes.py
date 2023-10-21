@@ -2796,6 +2796,8 @@ class _Variable(_Numeric):
     @cache
     def _get_eval(self, args):
         data = args.args[self]
+        if type(data) is not list:
+            return lambda index: data
         return lambda index: data[index]
 
     def output(self, data):
@@ -3035,6 +3037,34 @@ class _Accumulator(_Operator):
 
     def eval(self):
         return self
+
+    @cache
+    def _get_eval(self, args):
+        ops = self.ops
+        old_index = -1
+        old_value = self.initval._get_eval(args)(0)
+        right = self.right._get_eval(args)
+        size = self.size._get_eval(args) if self.size is not None else None
+        def eval(index):
+            nonlocal old_value
+            nonlocal old_index
+            if old_index == index:
+                return old_value
+            old_index = index
+
+            for op in ops:
+                if not isinstance(op, type):
+                    old_value = op.op(old_value, right(index), 0, 0)
+                elif issubclass(op, vtypes._BinaryOperator):
+                    old_value = op.op(old_value, right(index), 0, 0)
+                elif issubclass(op, vtypes._UnaryOperator):
+                    old_value = op.op(old_value, 0)
+
+            # for Pulse
+            if not ops and size is not None:
+                old_value = (index >= (size(index) - 1))
+            return old_value
+        return eval
 
     def _implement(self, m, seq, svalid=None, senable=None):
         if self.latency != 1:

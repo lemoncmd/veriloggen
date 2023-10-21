@@ -28,6 +28,7 @@ def mkLed():
     size = strm.parameter('size')
     sum, sum_valid = strm.ReduceAddValid(a, size)
     strm.sink(sum, 'sum', when=sum_valid, when_name='sum_valid')
+#    print(strm.eval({'a': [1,2,3,4], 'size': 4}))
 
     def comp_stream(size, offset):
         strm.set_source('a', ram_a, offset, size)

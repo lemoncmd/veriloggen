@@ -30,7 +30,7 @@ def mkLed():
     c = a + b
     strm.sink(c, 'c')
 #    time_start = time.perf_counter()
-#    print(strm.eval({'a': list(range(512)), 'b': list(range(512))}))
+#    print(strm.eval({'a': list(range(1000000)), 'b': list(range(1000000))}))
 #    time_end = time.perf_counter()
 #    print('time was %f' % (time_end - time_start))
 

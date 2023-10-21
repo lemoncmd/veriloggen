@@ -190,18 +190,29 @@ class Stream(BaseStream):
         self.eval_id_count += 1
 
         results = {}
+        evaluators = {}
         for name in sinks:
-            result = []
-            count = 0
-            evaluator = self.sinks[name]._get_eval(args)
-            while True:
+            results[name] = []
+            evaluators[name] = self.sinks[name]._get_eval(args)
+        count = 0
+        while True:
+            result = {}
+            for name in sinks:
                 try:
-                    result.append(evaluator(count))
+                    result[self.var_name_map[name]] = evaluators[name](count)
                 except Exception as e:
+                    #import traceback
+                    #print(traceback.format_exc())
                     #print(e)
                     break
+            else:
+                for name in sinks:
+                    if name in self.sink_when_map and not result[self.sink_when_map[name]]:
+                        continue
+                    results[name].append(result[self.var_name_map[name]])
                 count += 1
-            results[name] = result
+                continue
+            break
         return results
 
     def source(self, name=None, datawidth=None, point=0, signed=True, no_ctrl=False):
