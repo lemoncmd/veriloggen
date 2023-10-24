@@ -175,7 +175,7 @@ class Stream(BaseStream):
         def __hash__(self):
             return self.id
 
-    def eval(self, args={}, sinks=None):
+    def eval(self, args={}, sinks=None, patterns={}):
         if sinks is None:
             sinks = list(self.sinks.keys())
         elif type(sinks) is str:
@@ -183,9 +183,21 @@ class Stream(BaseStream):
         elif type(sinks) is not list:
             raise ValueError('sinks must be None, string or list')
 
+        def flatten(l):
+            for elem in l:
+                if type(elem) is list:
+                    yield from flatten(elem)
+                else:
+                    yield elem
         _args = {}
         for key in args:
-            _args[self.var_name_map[key]] = args[key]
+            arg = args[key]
+            # multidimentional list
+            if type(arg) is list and len(arg) != 0 and type(arg[0]) is list:
+                arg = list(flatten(arg))
+            #if key in patterns:
+            #    pass
+            _args[self.var_name_map[key]] = arg
         args = self._HashableEvalArgs(_args, self.eval_id_count)
         self.eval_id_count += 1
 
