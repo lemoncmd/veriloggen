@@ -212,10 +212,12 @@ class Stream(BaseStream):
             for name in sinks:
                 try:
                     result[self.var_name_map[name]] = evaluators[name](count)
+                except IndexError as e:
+                    break
                 except Exception as e:
-                    #import traceback
-                    #print(traceback.format_exc())
-                    #print(e)
+                    import traceback
+                    print(traceback.format_exc())
+                    print(e)
                     break
             else:
                 for name in sinks:

@@ -22,6 +22,26 @@ from . import madd
 # Object ID counter for object sorting key
 _object_counter = 0
 
+def _once_cache(l, old_index=-1, old_value=0):
+    def eval(index):
+        nonlocal old_index
+        nonlocal old_value
+        if old_index != index:
+            old_index = index
+            old_value = l(index)
+        return old_value
+    return eval
+
+def _once_cache_with_old_value(l, old_index=-1, old_value=0):
+    def eval(index):
+        nonlocal old_index
+        nonlocal old_value
+        if old_index != index:
+            old_index = index
+            old_value = l(index, old_value)
+        return old_value
+    return eval
+
 
 def Constant(value, fixed=True, point=0):
     if isinstance(value, int):
@@ -623,6 +643,9 @@ class _UnaryOperator(_Operator):
 
             self.sig_data = data
 
+    def _get_eval(self, args):
+        return self.right._get_eval(args)
+
 
 class Power(_BinaryOperator):
     latency = 0
@@ -696,6 +719,12 @@ class Times(_BinaryOperator):
                  ('a', ldata), ('b', rdata), ('c', odata)]
 
         m.Instance(inst, self.name('mul'), ports=ports)
+
+    @cache
+    def _get_eval(self, args):
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        return _once_cache(lambda index: left(index) * right(index))
 
 
 class Divide(_BinaryOperator):
@@ -928,23 +957,20 @@ class Plus(_BinaryOperator):
 
     @cache
     def _get_eval(self, args):
-        old_index = -1
-        old_value = None
         left = self.left._get_eval(args)
         right = self.right._get_eval(args)
-        def eval(index):
-            nonlocal old_index
-            nonlocal old_value
-            if old_index != index:
-                old_index = index
-                old_value = left(index) + right(index)
-            return old_value
-        return eval
+        return _once_cache(lambda index: left(index) + right(index))
 
 class Minus(_BinaryOperator):
 
     def eval(self):
         return self.left.eval() - self.right.eval()
+
+    @cache
+    def _get_eval(self, args):
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        return _once_cache(lambda index: left(index) - right(index))
 
 
 # general name alias
@@ -1025,6 +1051,12 @@ class Eq(_BinaryOperator):
 
     def eval(self):
         return self.left.eval() == self.right.eval()
+
+    @cache
+    def _get_eval(self, args):
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        return _once_cache(lambda index: left(index) == right(index))
 
 
 class NotEq(_BinaryOperator):
@@ -1182,11 +1214,23 @@ class And(_BinaryLogicalOperator):
     def eval(self):
         return self.left.eval() & self.right.eval()
 
+    @cache
+    def _get_eval(self, args):
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        return _once_cache(lambda index: left(index) & right(index))
+
 
 class Xor(_BinaryLogicalOperator):
 
     def eval(self):
         return self.left.eval() ^ self.right.eval()
+
+    @cache
+    def _get_eval(self, args):
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        return _once_cache(lambda index: left(index) ^ right(index))
 
 
 class Xnor(_BinaryLogicalOperator):
@@ -1199,11 +1243,23 @@ class Xnor(_BinaryLogicalOperator):
             return ret == 0
         return Xnor(left, right)
 
+    @cache
+    def _get_eval(self, args):
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        return _once_cache(lambda index: ~(left(index) ^ right(index)))
+
 
 class Or(_BinaryLogicalOperator):
 
     def eval(self):
         return self.left.eval() | self.right.eval()
+
+    @cache
+    def _get_eval(self, args):
+        left = self.left._get_eval(args)
+        right = self.right._get_eval(args)
+        return _once_cache(lambda index: left(index) | right(index))
 
 
 class Land(_BinaryLogicalOperator):
@@ -2502,6 +2558,11 @@ class _PlusN(_SpecialOperator):
             ret += var
         return ret
 
+    @cache
+    def _get_eval(self, args):
+        vars = [var._get_eval(args) for var in self.args]
+        return _once_cache(lambda index: sum([var(index) for var in vars]))
+
 
 class _MulAdd(_SpecialOperator):
     latency = 2 + 1
@@ -3054,7 +3115,7 @@ class _Accumulator(_Operator):
 
             for op in ops:
                 if not isinstance(op, type):
-                    old_value = op.op(old_value, right(index), 0, 0)
+                    old_value = op(old_value, right(index))
                 elif issubclass(op, vtypes._BinaryOperator):
                     old_value = op.op(old_value, right(index), 0, 0)
                 elif issubclass(op, vtypes._UnaryOperator):
@@ -3738,6 +3799,33 @@ class RandXorshift(_Accumulator):
 
         seq(data(randval), cond=enable_cond)
         seq(randval(next_value), cond=enable_cond)
+
+    @cache
+    def _get_eval(self, args):
+        ops = self.ops
+        old_index = 0
+        old_value = self.reg_initval._get_eval(args)(0)
+        right = self.right._get_eval(args)
+        def eval(index):
+            nonlocal old_value
+            nonlocal old_index
+            if old_index == index:
+                return old_value
+            old_index = index
+
+            if self.width == 32:
+                old_value = (old_value ^ (old_value << 13)) & ((1 << 32) - 1)
+                old_value = old_value ^ ((old_value >> 17) & ((1 << 32 - 17) - 1))
+                old_value = (old_value ^ (old_value << 5)) & ((1 << 32) - 1)
+            elif self.width == 64:
+                old_value = (old_value ^ (old_value << 13)) & ((1 << 64) - 1)
+                old_value = old_value ^ ((old_value >> 7) & ((1 << 64 - 7) - 1))
+                old_value = (old_value ^ (old_value << 17)) & ((1 << 64) - 1)
+            else:
+                raise ValueError("Invalid width value '%d', please specify 32 or 64" % width)
+
+            return old_value
+        return eval
 
 
 class Pulse(_Accumulator):
@@ -4918,18 +5006,10 @@ class ReadRAM(_SpecialOperator):
 
     @cache
     def _get_eval(self, args):
-        old_index = -1
-        old_value = None
         mem = args.args[self]
         addr = self.args[0]._get_eval(args)
-        def eval(index):
-            nonlocal old_index
-            nonlocal old_value
-            if old_index != index:
-                old_value = mem[addr(index)]
-                old_index = index
-            return old_value
-        return eval
+        when = self.args[1]._get_eval(args) if len(self.args) == 2 else None
+        return _once_cache_with_old_value(lambda index, old_value: mem[addr(index)] if when is None or when(index) else old_value)
 
 
 class WriteRAM(_SpecialOperator):
